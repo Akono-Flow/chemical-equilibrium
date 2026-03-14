@@ -801,9 +801,25 @@ input[type=range].lcr{width:100%;accent-color:var(--acc)}
 <!-- ==================== ICE CALCULATOR TAB ==================== -->
 <div class="tpanel" id="tab-ice">
   <div class="stitle">🧮 ICE Table Calculator</div>
-  <div class="sdesc">Enter initial moles of each species and the flask volume. The calculator converts moles → concentrations, solves the ICE table, and reports equilibrium moles and concentrations. Build and save your own custom reactions to browser storage.</div>
+  <div class="sdesc">Three calculation modes: <strong style="color:var(--acc)">① Find Concentrations</strong> — given Kc, find equilibrium concentrations. <strong style="color:var(--acc2)">② Find Kc (ICE)</strong> — given initial amounts and one equilibrium value. <strong style="color:var(--acc3)">③ Direct Kc</strong> — all equilibrium concentrations already known, just substitute and calculate.</div>
 
-  <!-- ── CUSTOM BUILDER (hidden until "Custom" selected) ── -->
+  <!-- ── DIRECTION TOGGLE ── -->
+  <div style="display:flex;gap:0;margin-bottom:18px;border:1px solid var(--bdr);border-radius:8px;overflow:hidden;width:fit-content;flex-wrap:wrap">
+    <button id="iceD1Btn" onclick="iceSetDir(1)"
+      style="font-family:'Rajdhani',sans-serif;font-size:.85rem;font-weight:700;letter-spacing:.5px;padding:10px 22px;border:none;cursor:pointer;background:var(--acc);color:var(--bg);transition:all .2s">
+      ① Find Concentrations (given Kc)
+    </button>
+    <button id="iceD2Btn" onclick="iceSetDir(2)"
+      style="font-family:'Rajdhani',sans-serif;font-size:.85rem;font-weight:700;letter-spacing:.5px;padding:10px 22px;border:none;cursor:pointer;background:var(--surf2);color:var(--dim);border-left:1px solid var(--bdr);transition:all .2s">
+      ② Find Kc (ICE — initial amounts given)
+    </button>
+    <button id="iceD3Btn" onclick="iceSetDir(3)"
+      style="font-family:'Rajdhani',sans-serif;font-size:.85rem;font-weight:700;letter-spacing:.5px;padding:10px 22px;border:none;cursor:pointer;background:var(--surf2);color:var(--dim);border-left:1px solid var(--bdr);transition:all .2s">
+      ③ Direct Kc (equilibrium concentrations given)
+    </button>
+  </div>
+
+  <!-- ── CUSTOM BUILDER (shared, shown when "custom" selected in either direction) ── -->
   <div id="iceBuilderPanel" style="display:none;background:var(--surf);border:1px solid var(--acc3);border-radius:8px;padding:18px 20px;margin-bottom:18px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
       <span style="font-family:'Rajdhani',sans-serif;font-size:1rem;font-weight:700;color:var(--acc3)">⚗ Custom Reaction Builder</span>
@@ -814,30 +830,25 @@ input[type=range].lcr{width:100%;accent-color:var(--acc)}
         </label>
       </div>
     </div>
-
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
       <div class="cgroup">
         <div class="clbl">Reaction Name / Label</div>
         <input class="iceinp" id="custName" type="text" placeholder="e.g. PCl₅ dissociation" style="width:100%">
       </div>
-      <div class="cgroup">
-        <div class="clbl">K<sub>c</sub> Value</div>
+      <div class="cgroup" id="custKcGroup">
+        <div class="clbl">K<sub>c</sub> Value <span style="color:var(--dim);font-weight:400">(optional for Direction 2)</span></div>
         <input class="iceinp" id="custKc" type="number" step="any" placeholder="e.g. 0.041" style="width:160px">
       </div>
     </div>
-
-    <!-- Species rows -->
     <div class="clbl" style="margin-bottom:8px">Species (add all reactants and products)</div>
     <div id="custSpeciesRows" style="margin-bottom:10px"></div>
     <button class="btn btn-s" style="font-size:.8rem;padding:5px 13px;margin-bottom:16px" onclick="iceAddSpeciesRow()">+ Add Species</button>
-
     <div style="background:var(--surf2);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:.82rem;color:var(--muted);line-height:1.7">
-      <strong style="color:var(--acc3)">How stoichiometry works:</strong>
-      Reactants have <em>negative</em> coefficients (they are consumed); products have <em>positive</em> coefficients (they are formed).
-      e.g. for &nbsp;<strong>N₂ + 3H₂ ⇌ 2NH₃</strong>&nbsp; enter: N₂ = −1, H₂ = −3, NH₃ = +2.
-      The order coefficient used in the Kc expression equals |stoich coefficient| unless you override it.
+      <strong style="color:var(--acc3)">Stoichiometry:</strong>
+      Reactants → negative coefficients; products → positive coefficients.
+      e.g. <strong>N₂ + 3H₂ ⇌ 2NH₃</strong>: N₂ = −1, H₂ = −3, NH₃ = +2.
+      Leave Order blank to use |stoich|.
     </div>
-
     <div style="display:flex;gap:9px;flex-wrap:wrap;align-items:center">
       <button class="btn btn-p" style="background:var(--acc3);border-color:var(--acc3)" onclick="iceSaveCustom()">💾 Save to Browser</button>
       <button class="btn btn-w" onclick="iceUseCustomNow()">▶ Use Without Saving</button>
@@ -845,58 +856,182 @@ input[type=range].lcr{width:100%;accent-color:var(--acc)}
     </div>
   </div>
 
-  <!-- ── MAIN SOLVE PANEL ── -->
-  <div class="icelayout">
-    <div>
-      <div class="cgroup" style="margin-bottom:13px">
-        <div class="clbl">Select Reaction</div>
-        <select id="icePreset" onchange="iceLoadPreset()" style="width:100%">
-          <optgroup label="Built-in Presets">
-            <option value="H2I2">H₂ + I₂ ⇌ 2HI (Kc = 54.3)</option>
-            <option value="N2O4">N₂O₄ ⇌ 2NO₂ (Kc = 4.64×10⁻³)</option>
-            <option value="NH3">N₂ + 3H₂ ⇌ 2NH₃ (Kc = 6.0×10⁻²)</option>
-            <option value="ester">CH₃COOH + C₂H₅OH ⇌ ester + H₂O (Kc = 4.0)</option>
-          </optgroup>
-          <optgroup label="Custom (Saved)" id="iceCustomOptgroup"></optgroup>
-          <optgroup label="New">
-            <option value="custom">＋ Build a Custom Reaction…</option>
-          </optgroup>
-        </select>
+  <!-- ══════════════════════════════════════════════
+       DIRECTION 1 — Find equilibrium concentrations
+       ══════════════════════════════════════════════ -->
+  <div id="iceD1Panel">
+    <div class="icelayout">
+      <div>
+        <div class="cgroup" style="margin-bottom:13px">
+          <div class="clbl">Select Reaction</div>
+          <select id="icePreset" onchange="iceLoadPreset()" style="width:100%">
+            <optgroup label="Built-in Presets">
+              <option value="H2I2">H₂ + I₂ ⇌ 2HI (Kc = 54.3)</option>
+              <option value="N2O4">N₂O₄ ⇌ 2NO₂ (Kc = 4.64×10⁻³)</option>
+              <option value="NH3">N₂ + 3H₂ ⇌ 2NH₃ (Kc = 6.0×10⁻²)</option>
+              <option value="ester">CH₃COOH + C₂H₅OH ⇌ ester + H₂O (Kc = 4.0)</option>
+            </optgroup>
+            <optgroup label="Custom (Saved)" id="iceCustomOptgroup"></optgroup>
+            <optgroup label="New"><option value="custom">＋ Build a Custom Reaction…</option></optgroup>
+          </select>
+        </div>
+        <div id="iceDeleteRow" style="display:none;margin-bottom:13px">
+          <button class="btn btn-d" style="font-size:.78rem;padding:5px 12px" onclick="iceDeleteCustom()">🗑 Delete This Saved Reaction</button>
+        </div>
+        <div class="cgroup" style="margin-bottom:13px">
+          <div class="clbl">K<sub>c</sub> Value</div>
+          <input class="iceinp" type="number" id="iceKc" step="any" placeholder="e.g. 54.3" style="width:140px">
+        </div>
+        <div class="cgroup" style="margin-bottom:13px">
+          <div class="clbl">Volume of Flask (dm³)</div>
+          <input class="iceinp" type="number" id="iceVol" step="any" value="1" style="width:140px" oninput="iceUpdateConcHints()">
+          <div id="iceVolHint" style="color:var(--muted);font-size:.78rem;margin-top:4px">[X] = n ÷ V</div>
+        </div>
+        <div id="iceSpeciesInputs" style="margin-bottom:14px"></div>
+        <div style="display:flex;gap:9px;flex-wrap:wrap">
+          <button class="btn btn-p" onclick="iceSolve()">▶ Solve</button>
+          <button class="btn btn-s" onclick="iceClear()">Clear</button>
+        </div>
+      </div>
+      <div>
+        <div class="clbl" style="margin-bottom:8px">ICE Table Output</div>
+        <div id="iceTableOut"><p style="color:var(--muted);font-size:.9rem">Select a reaction above to see the ICE table.</p></div>
+        <div id="iceResult" style="margin-top:14px"></div>
+      </div>
+    </div>
+    <div style="margin-top:18px">
+      <div class="clbl" style="margin-bottom:8px">Concentration Profile</div>
+      <div class="gpwrap" style="padding:4px;display:block">
+        <canvas id="iceGraphCanvas" width="740" height="280" style="display:block;max-width:100%"></canvas>
+      </div>
+    </div>
+  </div><!-- end iceD1Panel -->
+
+  <!-- ══════════════════════════════════════════════
+       DIRECTION 2 — Find Kc from equilibrium data
+       ══════════════════════════════════════════════ -->
+  <div id="iceD2Panel" style="display:none">
+    <div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:13px 17px;margin-bottom:18px;font-size:.9rem;color:var(--txt);line-height:1.75">
+      <strong style="color:var(--acc2)">How Direction 2 works:</strong>
+      You know the initial amounts and one piece of equilibrium data for a single species
+      (its equilibrium moles, equilibrium concentration, or the percentage of a reactant that was converted).
+      The ICE table fills in from stoichiometry and Kc is calculated at the end.
+    </div>
+    <div class="icelayout">
+      <div>
+        <div class="cgroup" style="margin-bottom:13px">
+          <div class="clbl">Select Reaction</div>
+          <select id="d2Preset" onchange="iceLoadD2Preset()" style="width:100%">
+            <optgroup label="Built-in Presets">
+              <option value="H2I2">H₂ + I₂ ⇌ 2HI</option>
+              <option value="N2O4">N₂O₄ ⇌ 2NO₂</option>
+              <option value="NH3">N₂ + 3H₂ ⇌ 2NH₃</option>
+              <option value="ester">CH₃COOH + C₂H₅OH ⇌ ester + H₂O</option>
+            </optgroup>
+            <optgroup label="Custom (Saved)" id="d2CustomOptgroup"></optgroup>
+            <optgroup label="New"><option value="custom">＋ Build a Custom Reaction…</option></optgroup>
+          </select>
+        </div>
+        <div class="cgroup" style="margin-bottom:13px">
+          <div class="clbl">Volume of Flask (dm³)</div>
+          <input class="iceinp" type="number" id="d2Vol" step="any" value="1" style="width:140px" oninput="d2UpdateHints()">
+        </div>
+        <div id="d2SpeciesInputs" style="margin-bottom:16px"></div>
+
+        <!-- Known equilibrium data -->
+        <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:8px;padding:14px 16px;margin-bottom:14px">
+          <div class="clbl" style="margin-bottom:11px;color:var(--acc2)">Known Equilibrium Data (one species only)</div>
+          <div class="cgroup" style="margin-bottom:11px">
+            <div class="clbl">Reference Species</div>
+            <select class="iceinp" id="d2RefSpecies" style="width:180px"></select>
+          </div>
+          <div class="cgroup" style="margin-bottom:11px">
+            <div class="clbl">Data Type</div>
+            <select class="iceinp" id="d2DataType" style="width:220px" onchange="d2UpdateDataLabel()">
+              <option value="eq_moles">Equilibrium moles (mol)</option>
+              <option value="eq_conc">Equilibrium concentration (mol dm⁻³)</option>
+              <option value="pct_conv">% Conversion of reactant</option>
+            </select>
+          </div>
+          <div class="cgroup">
+            <div class="clbl" id="d2ValLabel">Known value</div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <input class="iceinp" type="number" id="d2KnownVal" step="any" placeholder="Enter value" style="width:140px">
+              <span id="d2ValUnit" style="font-family:'Rajdhani',sans-serif;font-size:.82rem;color:var(--muted)">mol</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:9px;flex-wrap:wrap">
+          <button class="btn" style="background:var(--acc2);color:var(--bg);font-family:'Rajdhani',sans-serif;font-weight:700;font-size:.88rem;padding:8px 18px;border:none;border-radius:6px;cursor:pointer" onclick="d2Solve()">▶ Calculate Kc</button>
+          <button class="btn btn-s" onclick="d2Clear()">Clear</button>
+        </div>
+      </div>
+      <div>
+        <div class="clbl" style="margin-bottom:8px">ICE Table Output</div>
+        <div id="d2TableOut"><p style="color:var(--muted);font-size:.9rem">Select a reaction and enter data above, then click Calculate Kc.</p></div>
+        <div id="d2Result" style="margin-top:14px"></div>
+      </div>
+    </div>
+    <div style="margin-top:18px">
+      <div class="clbl" style="margin-bottom:8px">Concentration Profile</div>
+      <div class="gpwrap" style="padding:4px;display:block">
+        <canvas id="d2GraphCanvas" width="740" height="280" style="display:block;max-width:100%"></canvas>
+      </div>
+    </div>
+  </div><!-- end iceD2Panel -->
+
+  <!-- ══════════════════════════════════════════════
+       DIRECTION 3 — Direct Kc from known equilibrium concentrations
+       ══════════════════════════════════════════════ -->
+  <div id="iceD3Panel" style="display:none">
+    <div style="background:rgba(124,58,237,.07);border:1px solid rgba(124,58,237,.3);border-radius:8px;padding:13px 17px;margin-bottom:18px;font-size:.9rem;color:var(--txt);line-height:1.75">
+      <strong style="color:var(--acc3)">How Direction 3 works:</strong>
+      You are given the equilibrium concentration of <em>every</em> species directly (no initial amounts needed, no ICE table).
+      Simply enter those concentrations, and the app substitutes them into the Kc expression and computes the answer — exactly as you would do by hand.
+      <br>Example: <em>"[N₂] = 0.15 M, [Cl₂] = 0.25 M, [NCl₃] = 0.50 M. Calculate Kc."</em>
+    </div>
+
+    <div class="icelayout">
+      <div>
+        <div class="cgroup" style="margin-bottom:13px">
+          <div class="clbl">Select Reaction</div>
+          <select id="d3Preset" onchange="iceLoadD3Preset()" style="width:100%">
+            <optgroup label="Built-in Presets">
+              <option value="H2I2">H₂ + I₂ ⇌ 2HI</option>
+              <option value="N2O4">N₂O₄ ⇌ 2NO₂</option>
+              <option value="NH3">N₂ + 3H₂ ⇌ 2NH₃</option>
+              <option value="ester">CH₃COOH + C₂H₅OH ⇌ ester + H₂O</option>
+            </optgroup>
+            <optgroup label="Custom (Saved)" id="d3CustomOptgroup"></optgroup>
+            <optgroup label="New"><option value="custom">＋ Build a Custom Reaction…</option></optgroup>
+          </select>
+        </div>
+
+        <!-- Equilibrium concentration inputs — generated dynamically -->
+        <div id="d3SpeciesInputs" style="margin-bottom:16px">
+          <p style="color:var(--muted);font-size:.88rem">Select a reaction above to enter equilibrium concentrations.</p>
+        </div>
+
+        <div style="display:flex;gap:9px;flex-wrap:wrap">
+          <button class="btn" onclick="d3Solve()"
+            style="background:var(--acc3);color:#fff;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:.88rem;padding:8px 18px;border:none;border-radius:6px;cursor:pointer">
+            ▶ Calculate Kc
+          </button>
+          <button class="btn btn-s" onclick="d3Clear()">Clear</button>
+        </div>
       </div>
 
-      <!-- Delete button for saved custom reactions -->
-      <div id="iceDeleteRow" style="display:none;margin-bottom:13px">
-        <button class="btn btn-d" style="font-size:.78rem;padding:5px 12px" onclick="iceDeleteCustom()">🗑 Delete This Saved Reaction</button>
+      <div>
+        <div class="clbl" style="margin-bottom:8px">Result</div>
+        <div id="d3Result">
+          <p style="color:var(--muted);font-size:.9rem">Enter equilibrium concentrations and click Calculate Kc.</p>
+        </div>
       </div>
+    </div>
+  </div><!-- end iceD3Panel -->
 
-      <div class="cgroup" style="margin-bottom:13px">
-        <div class="clbl">K<sub>c</sub> Value</div>
-        <input class="iceinp" type="number" id="iceKc" step="any" placeholder="e.g. 54.3" style="width:140px">
-      </div>
-      <div class="cgroup" style="margin-bottom:13px">
-        <div class="clbl">Volume of Flask (dm³)</div>
-        <input class="iceinp" type="number" id="iceVol" step="any" value="1" style="width:140px" oninput="iceUpdateConcHints()">
-        <div id="iceVolHint" style="color:var(--muted);font-size:.78rem;margin-top:4px">[X] = n ÷ V</div>
-      </div>
-      <div id="iceSpeciesInputs" style="margin-bottom:14px"></div>
-      <div style="display:flex;gap:9px;flex-wrap:wrap">
-        <button class="btn btn-p" onclick="iceSolve()">▶ Solve</button>
-        <button class="btn btn-s" onclick="iceClear()">Clear</button>
-      </div>
-    </div>
-    <div>
-      <div class="clbl" style="margin-bottom:8px">ICE Table Output</div>
-      <div id="iceTableOut"><p style="color:var(--muted);font-size:.9rem">Select a reaction above to see the ICE table.</p></div>
-      <div id="iceResult" style="margin-top:14px"></div>
-    </div>
-  </div>
-  <div style="margin-top:18px">
-    <div class="clbl" style="margin-bottom:8px">Concentration Profile</div>
-    <div class="gpwrap" style="padding:4px;display:block">
-      <canvas id="iceGraphCanvas" width="740" height="280" style="display:block;max-width:100%"></canvas>
-    </div>
-  </div>
-</div>
+</div><!-- end tab-ice -->
 
 <!-- ==================== LIBRARY TAB ==================== -->
 <div class="tpanel" id="tab-lib">
@@ -1982,12 +2117,24 @@ function iceBuildCustomPreset(){
 // ── Use without saving ──
 function iceUseCustomNow(){
   const P = iceBuildCustomPreset(); if (!P) return;
-  _iceActivePreset = P;
-  document.getElementById('iceKc').value = P.Kc;
-  document.getElementById('iceVol').value = 1;
-  iceRenderSpeciesInputs(P);
-  iceUpdateConcHints();
-  document.getElementById('custSaveMsg').textContent = '✓ Loaded — ready to solve';
+  if(_iceDir === 2){
+    _d2ActivePreset = P;
+    d2RenderInputs(P);
+    document.getElementById('iceBuilderPanel').style.display='none';
+    document.getElementById('custSaveMsg').textContent='✓ Loaded into Direction 2';
+  } else if(_iceDir === 3){
+    _d3ActivePreset = P;
+    d3RenderInputs(P);
+    document.getElementById('iceBuilderPanel').style.display='none';
+    document.getElementById('custSaveMsg').textContent='✓ Loaded into Direction 3';
+  } else {
+    _iceActivePreset = P;
+    document.getElementById('iceKc').value = P.Kc;
+    document.getElementById('iceVol').value = 1;
+    iceRenderSpeciesInputs(P);
+    iceUpdateConcHints();
+    document.getElementById('custSaveMsg').textContent = '✓ Loaded — ready to solve';
+  }
 }
 
 // ── Save to localStorage ──
@@ -2150,8 +2297,8 @@ function iceSolve(){
   drawIceGraph(P, initConcs, xc);
 }
 
-function drawIceGraph(P,inits,x){
-  const can=document.getElementById('iceGraphCanvas'); if(!can) return;
+function drawIceGraph(P,inits,x,canvasId='iceGraphCanvas'){
+  const can=document.getElementById(canvasId); if(!can) return;
   const ctx=can.getContext('2d');
   const W=can.width||740, H=can.height||280;
   gridPaper(ctx,W,H);
@@ -2203,6 +2350,410 @@ function iceClear(){
   document.getElementById('iceResult').innerHTML='';
   const can=document.getElementById('iceGraphCanvas');
   if(can){const ctx=can.getContext('2d');gridPaper(ctx,can.width,can.height);}
+}
+
+// ═══════════════════════════════════════════════
+// DIRECTION TOGGLE
+// ═══════════════════════════════════════════════
+let _iceDir = 1;
+function iceSetDir(dir){
+  _iceDir = dir;
+  document.getElementById('iceD1Panel').style.display = dir===1 ? 'block' : 'none';
+  document.getElementById('iceD2Panel').style.display = dir===2 ? 'block' : 'none';
+  document.getElementById('iceD3Panel').style.display = dir===3 ? 'block' : 'none';
+  const d1btn = document.getElementById('iceD1Btn');
+  const d2btn = document.getElementById('iceD2Btn');
+  const d3btn = document.getElementById('iceD3Btn');
+  d1btn.style.background = dir===1 ? 'var(--acc)'  : 'var(--surf2)';
+  d1btn.style.color      = dir===1 ? 'var(--bg)'   : 'var(--dim)';
+  d2btn.style.background = dir===2 ? 'var(--acc2)' : 'var(--surf2)';
+  d2btn.style.color      = dir===2 ? 'var(--bg)'   : 'var(--dim)';
+  d3btn.style.background = dir===3 ? 'var(--acc3)' : 'var(--surf2)';
+  d3btn.style.color      = dir===3 ? '#fff'        : 'var(--dim)';
+  // Hide builder when switching direction
+  document.getElementById('iceBuilderPanel').style.display = 'none';
+  if (dir===2) iceLoadD2Preset();
+  if (dir===3) iceLoadD3Preset();
+}
+
+// ═══════════════════════════════════════════════
+// DIRECTION 2 — preset loader
+// ═══════════════════════════════════════════════
+let _d2ActivePreset = null;
+
+function iceLoadD2Preset(){
+  const key = document.getElementById('d2Preset').value;
+  const builder = document.getElementById('iceBuilderPanel');
+
+  if(key === 'custom'){
+    builder.style.display = 'block';
+    document.getElementById('d2SpeciesInputs').innerHTML =
+      '<p style="color:var(--muted);font-size:.88rem">Build your reaction above, then click <strong style="color:var(--acc3)">Use Without Saving</strong>.</p>';
+    _d2ActivePreset = null;
+    if(document.getElementById('custSpeciesRows').children.length === 0){
+      iceAddSpeciesRow('A',-1); iceAddSpeciesRow('B',-1); iceAddSpeciesRow('C',1);
+    }
+    return;
+  }
+  builder.style.display = 'none';
+
+  let P = null;
+  if(key.startsWith('ice_custom_')){
+    try{ P = JSON.parse(localStorage.getItem(key)); }catch(e){}
+  } else {
+    P = ICE_PRESETS[key];
+  }
+  if(!P) return;
+  _d2ActivePreset = P;
+  d2RenderInputs(P);
+}
+
+function d2RenderInputs(P){
+  const c = document.getElementById('d2SpeciesInputs'); c.innerHTML = '';
+  P.species.forEach((sp,i)=>{
+    c.innerHTML += `
+      <div class="cgroup" style="margin-bottom:10px">
+        <div class="clbl">Initial moles of ${sp.n} (mol)</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input class="iceinp" type="number" step="any" id="d2_i${i}" value="${sp.init}"
+            style="width:120px" oninput="d2UpdateHints()">
+          <span id="d2_hint${i}" style="font-family:'JetBrains Mono',monospace;font-size:.78rem;color:var(--acc2);min-width:130px"></span>
+        </div>
+      </div>`;
+  });
+  // Populate reference species dropdown
+  const sel = document.getElementById('d2RefSpecies'); sel.innerHTML = '';
+  P.species.forEach(sp=>{
+    const opt = document.createElement('option');
+    opt.value = sp.n; opt.textContent = sp.n;
+    sel.appendChild(opt);
+  });
+  d2UpdateHints();
+  d2UpdateDataLabel();
+}
+
+function d2UpdateHints(){
+  const V = parseFloat(document.getElementById('d2Vol').value)||1;
+  const P = _d2ActivePreset; if(!P) return;
+  P.species.forEach((_,i)=>{
+    const n = parseFloat(document.getElementById('d2_i'+i)?.value)||0;
+    const h = document.getElementById('d2_hint'+i);
+    if(h) h.textContent = `= ${(n/V).toFixed(4)} mol dm⁻³`;
+  });
+}
+
+function d2UpdateDataLabel(){
+  const type = document.getElementById('d2DataType').value;
+  const lbl  = document.getElementById('d2ValLabel');
+  const unit = document.getElementById('d2ValUnit');
+  const refSel = document.getElementById('d2RefSpecies');
+  const sp = refSel?.value || '?';
+  if(type==='eq_moles'){
+    lbl.textContent  = `Equilibrium moles of ${sp}`;
+    unit.textContent = 'mol';
+  } else if(type==='eq_conc'){
+    lbl.textContent  = `Equilibrium [${sp}]`;
+    unit.textContent = 'mol dm⁻³';
+  } else {
+    lbl.textContent  = `% of ${sp} converted`;
+    unit.textContent = '%';
+  }
+}
+
+// ═══════════════════════════════════════════════
+// DIRECTION 2 — solve
+// ═══════════════════════════════════════════════
+function d2Solve(){
+  const P = _d2ActivePreset;
+  if(!P){ alert('Select a reaction first.'); return; }
+  const V       = parseFloat(document.getElementById('d2Vol').value)||1;
+  const refName = document.getElementById('d2RefSpecies').value;
+  const type    = document.getElementById('d2DataType').value;
+  const known   = parseFloat(document.getElementById('d2KnownVal').value);
+  if(isNaN(known)||known<0){ alert('Enter a valid known equilibrium value.'); return; }
+
+  const refIdx  = P.species.findIndex(sp=>sp.n===refName);
+  if(refIdx<0){ alert('Reference species not found.'); return; }
+  const refStoich = P.species[refIdx].s;
+
+  // Read initial moles → initial concentrations
+  const initMoles = P.species.map((_,i)=>parseFloat(document.getElementById('d2_i'+i).value)||0);
+  const initConcs = initMoles.map(n=>n/V);
+
+  // ── Compute extent x_c (concentration basis) from known value ──
+  let x_c;
+  if(type==='eq_moles'){
+    // eq_moles = init_moles + stoich * x_c * V  →  x_c = (eq_moles/V - initConcs[ref]) / stoich
+    const eqConc_ref = known / V;
+    x_c = (eqConc_ref - initConcs[refIdx]) / refStoich;
+  } else if(type==='eq_conc'){
+    // eq_conc = initConc + stoich * x_c  →  x_c = (eq_conc - initConc) / stoich
+    x_c = (known - initConcs[refIdx]) / refStoich;
+  } else {
+    // % conversion: only valid for a reactant (stoich < 0)
+    if(refStoich >= 0){ alert('% conversion applies to reactants only (negative stoich). Please select a reactant.'); return; }
+    // moles consumed of ref species = (pct/100) * init_moles_ref
+    // moles consumed = |stoich_ref| * x_m  →  x_m = consumed / |stoich_ref|
+    // x_c = x_m / V
+    const consumed = (known/100) * initMoles[refIdx];
+    x_c = consumed / (Math.abs(refStoich) * V);
+  }
+
+  // Validate x_c
+  if(isNaN(x_c)){ alert('Could not compute extent of reaction. Check your inputs.'); return; }
+
+  // ── All equilibrium concentrations from stoichiometry ──
+  const eqConcs = initConcs.map((c,i)=>Math.max(0, c + P.species[i].s * x_c));
+  const eqMoles = eqConcs.map(c=>c*V);
+  const x_m     = x_c * V;
+
+  // ── Calculate Kc ──
+  let num=1, den=1;
+  for(const{idx,o} of P.rev) num *= Math.pow(Math.max(1e-30, eqConcs[idx]), o);
+  for(const{idx,o} of P.fwd) den *= Math.pow(Math.max(1e-30, eqConcs[idx]), o);
+  const Kc = den > 1e-30 ? num/den : Infinity;
+
+  // ── Compute units of Kc ──
+  const sumExp = P.rev.reduce((a,{o})=>a+o, 0) - P.fwd.reduce((a,{o})=>a+o, 0);
+  let kcUnits = 'dimensionless';
+  if(sumExp > 0)       kcUnits = `(mol dm⁻³)^${sumExp > 1 ? sumExp : ''}`.replace('^1','').replace('(mol dm⁻³)^','mol dm⁻³ × (mol dm⁻³)^').replace('× (mol dm⁻³)^1','') || `mol${sumExp>1?sumExp:''} dm⁻${3*sumExp}`;
+  if(sumExp > 0)       kcUnits = `mol${sumExp===1?'':sumExp} dm⁻${3*sumExp}`;
+  if(sumExp < 0)       kcUnits = `dm${3*sumExp} mol${sumExp===-1?'⁻¹':'⁻'+Math.abs(sumExp)}`;
+  if(sumExp === 0)     kcUnits = 'dimensionless';
+
+  // ── Build ICE table ──
+  let html = `<div style="overflow-x:auto"><table class="icetbl">
+    <tr><th>Row</th><th>Unit</th>`;
+  P.species.forEach(sp=>{ html+=`<th>${sp.n}</th>`; });
+  html += `</tr>
+    <tr class="row-I"><td class="row-lbl">I</td><td style="font-size:.75rem;color:var(--muted)">mol</td>`;
+  initMoles.forEach(n=>{ html+=`<td>${n.toFixed(4)}</td>`; });
+  html += `</tr><tr style="background:rgba(0,212,170,.03)">
+    <td></td><td style="font-size:.75rem;color:var(--muted)">mol dm⁻³</td>`;
+  initConcs.forEach(c=>{ html+=`<td style="font-size:.8rem;color:var(--dim)">${c.toFixed(4)}</td>`; });
+  html += `</tr><tr class="row-C"><td class="row-lbl">C</td><td style="font-size:.75rem;color:var(--muted)">mol</td>`;
+  P.species.forEach((sp,i)=>{
+    const chg = sp.s * x_m;
+    const isRef = i===refIdx;
+    html += `<td${isRef?' style="border:2px solid var(--acc2)"':''}>${chg>=0?'+':''}${chg.toFixed(4)}</td>`;
+  });
+  html += `</tr><tr class="row-E"><td class="row-lbl">E</td><td style="font-size:.75rem;color:var(--muted)">mol</td>`;
+  eqMoles.forEach((n,i)=>{
+    const isRef = i===refIdx;
+    html += `<td${isRef?' style="border:2px solid var(--acc2)"':''}><strong>${n.toFixed(4)}</strong></td>`;
+  });
+  html += `</tr><tr style="background:rgba(245,158,11,.07)">
+    <td class="row-lbl" style="font-size:.7rem;color:var(--acc2)">[ ]</td>
+    <td style="font-size:.75rem;color:var(--muted)">mol dm⁻³</td>`;
+  eqConcs.forEach(c=>{ html+=`<td style="color:var(--acc2);font-weight:700">${c.toFixed(4)}</td>`; });
+  html += `</tr></table></div>
+    <p style="font-size:.78rem;color:var(--muted);margin-top:6px">
+      Highlighted column = reference species with known equilibrium value.
+      [ ] row = equilibrium concentrations used to calculate Kc.
+    </p>`;
+  document.getElementById('d2TableOut').innerHTML = html;
+
+  // ── Result box ──
+  // Format Kc nicely
+  const kcStr = (Kc < 0.001 || Kc > 9999) ? Kc.toExponential(4) : Kc.toFixed(4);
+  document.getElementById('d2Result').innerHTML = `
+    <div style="background:rgba(245,158,11,.07);border:1px solid var(--acc2);border-radius:8px;padding:16px 18px">
+      <div style="font-family:'Rajdhani',sans-serif;font-size:.72rem;font-weight:700;color:var(--acc2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px">Result — Kc Calculation</div>
+      <p style="margin:0 0 8px;font-size:1rem">
+        <strong>K<sub>c</sub> = ${kcStr}</strong>
+        &ensp;<span style="font-size:.85rem;color:var(--muted)">${kcUnits}</span>
+      </p>
+      <p style="margin:4px 0;font-size:.88rem">Extent of reaction x = <strong>${x_m.toFixed(5)} mol</strong>
+        &nbsp;= ${x_c.toFixed(5)} mol dm⁻³ at V = ${V} dm³</p>
+      <p style="margin:8px 0 2px;font-size:.82rem;color:var(--muted)">
+        Kc expression: products<sup>stoich</sup> ÷ reactants<sup>stoich</sup><br>
+        = ${P.rev.map(({idx,o})=>`[${P.species[idx].n}]${o>1?'<sup>'+o+'</sup>':''}`).join(' × ')}
+        &nbsp;÷&nbsp;
+        ${P.fwd.map(({idx,o})=>`[${P.species[idx].n}]${o>1?'<sup>'+o+'</sup>':''}`).join(' × ')}<br>
+        = ${P.rev.map(({idx,o})=>`(${eqConcs[idx].toFixed(4)})${o>1?'<sup>'+o+'</sup>':''}`).join(' × ')}
+        &nbsp;÷&nbsp;
+        ${P.fwd.map(({idx,o})=>`(${eqConcs[idx].toFixed(4)})${o>1?'<sup>'+o+'</sup>':''}`).join(' × ')}
+        = <strong>${kcStr}</strong>
+      </p>
+    </div>`;
+
+  // Draw graph (same grid-paper style)
+  drawIceGraph(P, initConcs, x_c, 'd2GraphCanvas');
+}
+
+function d2Clear(){
+  document.getElementById('d2TableOut').innerHTML='<p style="color:var(--muted);font-size:.9rem">Cleared.</p>';
+  document.getElementById('d2Result').innerHTML='';
+  const can=document.getElementById('d2GraphCanvas');
+  if(can){const ctx=can.getContext('2d');gridPaper(ctx,can.width,can.height);}
+}
+
+// ═══════════════════════════════════════════════
+// DIRECTION 3 — Direct Kc from equilibrium concentrations
+// ═══════════════════════════════════════════════
+let _d3ActivePreset = null;
+
+function iceLoadD3Preset(){
+  const key = document.getElementById('d3Preset').value;
+  const builder = document.getElementById('iceBuilderPanel');
+
+  if(key === 'custom'){
+    builder.style.display = 'block';
+    document.getElementById('d3SpeciesInputs').innerHTML =
+      '<p style="color:var(--muted);font-size:.88rem">Build your reaction above, then click <strong style="color:var(--acc3)">Use Without Saving</strong>.</p>';
+    _d3ActivePreset = null;
+    if(document.getElementById('custSpeciesRows').children.length === 0){
+      iceAddSpeciesRow('A',-1); iceAddSpeciesRow('B',-1); iceAddSpeciesRow('C',1);
+    }
+    return;
+  }
+  builder.style.display = 'none';
+
+  let P = null;
+  if(key.startsWith('ice_custom_')){
+    try{ P = JSON.parse(localStorage.getItem(key)); }catch(e){}
+  } else {
+    P = ICE_PRESETS[key];
+  }
+  if(!P) return;
+  _d3ActivePreset = P;
+  d3RenderInputs(P);
+}
+
+function d3RenderInputs(P){
+  const c = document.getElementById('d3SpeciesInputs');
+  c.innerHTML = '';
+  // Build a readable reaction string for context
+  const rxnStr = P.species.filter(sp=>sp.s<0).map(sp=>(Math.abs(sp.s)===1?'':Math.abs(sp.s))+(sp.n)).join(' + ')
+    + ' ⇌ '
+    + P.species.filter(sp=>sp.s>0).map(sp=>(sp.s===1?'':sp.s)+(sp.n)).join(' + ');
+  c.innerHTML += `<div style="background:var(--surf2);border-radius:6px;padding:9px 13px;margin-bottom:13px;font-family:'JetBrains Mono',monospace;font-size:.82rem;color:var(--acc3)">${rxnStr}</div>`;
+  // One concentration input per species
+  P.species.forEach((sp,i)=>{
+    const roleColor = sp.s < 0 ? 'var(--red)' : 'var(--grn)';
+    const roleLabel = sp.s < 0 ? 'reactant' : 'product';
+    c.innerHTML += `
+      <div class="cgroup" style="margin-bottom:10px">
+        <div class="clbl">
+          [${sp.n}]<sub>eq</sub>
+          <span style="color:${roleColor};font-size:.68rem;font-weight:700;margin-left:6px;text-transform:uppercase">${roleLabel}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input class="iceinp" type="number" step="any" id="d3_c${i}" placeholder="mol dm⁻³"
+            style="width:140px">
+          <span style="font-family:'Rajdhani',sans-serif;font-size:.78rem;color:var(--muted)">mol dm⁻³</span>
+        </div>
+      </div>`;
+  });
+}
+
+function d3Solve(){
+  const P = _d3ActivePreset;
+  if(!P){ alert('Select a reaction first.'); return; }
+
+  // Read equilibrium concentrations
+  const eqConcs = P.species.map((_,i)=>{
+    const v = parseFloat(document.getElementById('d3_c'+i)?.value);
+    return isNaN(v) ? null : v;
+  });
+
+  // Validate — all must be provided and non-negative
+  const missing = P.species.filter((_,i)=>eqConcs[i]===null||eqConcs[i]<0).map(sp=>sp.n);
+  if(missing.length > 0){
+    alert(`Please enter valid equilibrium concentrations for: ${missing.join(', ')}`);
+    return;
+  }
+
+  // Calculate Kc: products^stoich / reactants^stoich
+  let num = 1, den = 1;
+  for(const{idx,o} of P.rev) num *= Math.pow(Math.max(1e-30, eqConcs[idx]), o);
+  for(const{idx,o} of P.fwd) den *= Math.pow(Math.max(1e-30, eqConcs[idx]), o);
+  const Kc = den > 1e-30 ? num / den : Infinity;
+
+  // Units of Kc
+  const sumExp = P.rev.reduce((a,{o})=>a+o, 0) - P.fwd.reduce((a,{o})=>a+o, 0);
+  let kcUnits;
+  if(sumExp === 0)      kcUnits = 'dimensionless';
+  else if(sumExp > 0)   kcUnits = `mol${sumExp===1?'':sumExp} dm⁻${3*sumExp}`;
+  else                  kcUnits = `dm${3*Math.abs(sumExp)} mol⁻${Math.abs(sumExp)===1?'¹':Math.abs(sumExp)}`;
+
+  // Format Kc
+  const kcStr = (Kc < 0.001 || Kc > 9999) ? Kc.toExponential(4) : Kc.toFixed(4);
+
+  // Build the Kc expression string with coefficients
+  const numTerms = P.rev.map(({idx,o})=>`[${P.species[idx].n}]${o>1?`<sup>${o}</sup>`:''}`).join(' × ');
+  const denTerms = P.fwd.map(({idx,o})=>`[${P.species[idx].n}]${o>1?`<sup>${o}</sup>`:''}`).join(' × ');
+  const numVals  = P.rev.map(({idx,o})=>`(${eqConcs[idx].toFixed(4)})${o>1?`<sup>${o}</sup>`:''}`).join(' × ');
+  const denVals  = P.fwd.map(({idx,o})=>`(${eqConcs[idx].toFixed(4)})${o>1?`<sup>${o}</sup>`:''}`).join(' × ');
+  // Compute numerator and denominator values for display
+  const numVal = P.rev.reduce((a,{idx,o})=>a*Math.pow(eqConcs[idx],o),1);
+  const denVal = P.fwd.reduce((a,{idx,o})=>a*Math.pow(eqConcs[idx],o),1);
+  const numValStr = numVal < 0.001 || numVal > 9999 ? numVal.toExponential(4) : numVal.toFixed(6);
+  const denValStr = denVal < 0.001 || denVal > 9999 ? denVal.toExponential(4) : denVal.toFixed(6);
+
+  document.getElementById('d3Result').innerHTML = `
+    <div style="background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.35);border-radius:8px;padding:18px 20px">
+      <div style="font-family:'Rajdhani',sans-serif;font-size:.72rem;font-weight:700;color:var(--acc3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px">
+        Step-by-Step Solution
+      </div>
+
+      <div style="margin-bottom:12px">
+        <div style="font-family:'Rajdhani',sans-serif;font-size:.78rem;color:var(--muted);margin-bottom:5px">Step 1 — Write the Kc expression</div>
+        <div style="background:var(--surf2);border-radius:6px;padding:10px 14px;font-size:.9rem">
+          K<sub>c</sub> = <span style="border-bottom:2px solid var(--txt);padding-bottom:2px">${numTerms}</span> ÷ ${denTerms}
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <div style="font-family:'Rajdhani',sans-serif;font-size:.78rem;color:var(--muted);margin-bottom:5px">Step 2 — Substitute equilibrium concentrations</div>
+        <div style="background:var(--surf2);border-radius:6px;padding:10px 14px;font-size:.9rem">
+          K<sub>c</sub> = <span style="border-bottom:2px solid var(--acc3);padding-bottom:2px">${numVals}</span> ÷ ${denVals}
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <div style="font-family:'Rajdhani',sans-serif;font-size:.78rem;color:var(--muted);margin-bottom:5px">Step 3 — Evaluate numerator and denominator</div>
+        <div style="background:var(--surf2);border-radius:6px;padding:10px 14px;font-size:.9rem">
+          K<sub>c</sub> = ${numValStr} ÷ ${denValStr}
+        </div>
+      </div>
+
+      <div style="background:rgba(124,58,237,.12);border:2px solid var(--acc3);border-radius:8px;padding:14px 18px;text-align:center">
+        <div style="font-family:'Rajdhani',sans-serif;font-size:.72rem;color:var(--acc3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">Answer</div>
+        <div style="font-size:1.4rem;font-weight:700;font-family:'JetBrains Mono',monospace">
+          K<sub>c</sub> = ${kcStr}
+          <span style="font-size:.82rem;color:var(--muted);font-weight:400;margin-left:8px">${kcUnits}</span>
+        </div>
+        <div style="font-size:.78rem;color:var(--muted);margin-top:6px">
+          ${sumExp===0 ? 'Equal moles on both sides → Kc is dimensionless' :
+            sumExp>0  ? `Δn = +${sumExp} (more moles of products) → units = mol${sumExp>1?sumExp:''} dm⁻${3*sumExp}` :
+                        `Δn = ${sumExp} (more moles of reactants) → units = dm${3*Math.abs(sumExp)} mol⁻${Math.abs(sumExp)}`}
+        </div>
+      </div>
+    </div>`;
+}
+
+function d3Clear(){
+  const P = _d3ActivePreset;
+  if(P) d3RenderInputs(P); // reset input fields
+  document.getElementById('d3Result').innerHTML =
+    '<p style="color:var(--muted);font-size:.9rem">Enter equilibrium concentrations and click Calculate Kc.</p>';
+}
+
+// Sync saved customs into all three direction dropdowns
+function iceLoadSavedCustoms(){
+  ['iceCustomOptgroup','d2CustomOptgroup','d3CustomOptgroup'].forEach(grpId=>{
+    const grp=document.getElementById(grpId); if(!grp) return;
+    grp.innerHTML='';
+    try{
+      Object.keys(localStorage).filter(k=>k.startsWith('ice_custom_')).sort().forEach(k=>{
+        const rx=JSON.parse(localStorage.getItem(k));
+        const opt=document.createElement('option');
+        opt.value=k; opt.textContent=rx.label||rx.name||k;
+        grp.appendChild(opt);
+      });
+    }catch(e){}
+  });
 }
 
 // ============================================================
