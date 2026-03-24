@@ -248,7 +248,7 @@ input[type=range].lcr{width:100%;accent-color:var(--acc)}
   <button class="tbtn" onclick="showTab('lc',this)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Le Chatelier
   </button>
-  <button class="tbtn" onclick="showTab('calc',this)">
+  <button class="tbtn" id="tab-btn-calc" style="display:none" onclick="showTab('calc',this)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="14" y1="14" x2="16" y2="14"/></svg>Worked Examples
   </button>
   <button class="tbtn" onclick="showTab('ice',this)">
@@ -3050,6 +3050,19 @@ document.addEventListener('DOMContentLoaded',async ()=>{
    const auth = await requireAppAccess('kc', 'no-access.html');
   if (!auth) return;
   document.getElementById('page-loader').remove();
+
+   // ── Feature flags ──────────────────────────────────────────────
+  try {
+    const fr = await _scqSupabase.rpc('get_my_features', { p_app_slug: 'kc' });
+    const features = (fr && fr.data) ? fr.data : {};
+    if (features.worked_examples === true) {
+      // Restore display:flex — tbtn uses flex for its SVG icon + text layout
+      document.getElementById('tab-btn-calc').style.display = 'flex';
+    }
+  } catch (_) {
+    // Non-fatal — tab stays hidden
+  }
+  // ──────────────────────────────────────────────────────────────
   // KaTeX auto-render — all four delimiter styles
   renderMathInElement(document.body,{
     delimiters:[
